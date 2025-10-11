@@ -65,6 +65,12 @@ app.get('/users', (req, res) => {
   res.send(user)
 })
 
+app.get('/logout', (req, res) =>{
+  req.session.destroy(() =>{
+    res.send("session destroyed")
+  })
+})
+
 
 
 
