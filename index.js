@@ -4,12 +4,38 @@ const cors = require('cors');
 const passport = require('passport');
 const LocalStrategy = require('passport-local');
 const session = require('express-session');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' })
 const app = express();
+
 // Setting up global variable for user, dunno if it will work
-let user = [{
-  username: "user",
-  password: "pass"
-}]
+let user = [
+  {
+    id: 1,
+    username: "admin",
+    password: "pass",
+    role: "admin"
+  },
+  {
+    id: 2,
+    username: "student",
+    password: "pass",
+    role: "student"
+  }
+]
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // Specify the directory where files will be saved
+    cb(null, 'uploads/')
+  },
+  filename: function (req, file, cb) {
+    // Create a unique filename (e.g., timestamp + original name)
+    cb(null, file.originalname)
+  }
+});
+
+const uploadToDisk = multer({ storage: storage });
 // setting up middlewares
 app.use(cors());
 app.use(express.json());
@@ -25,33 +51,43 @@ app.use(passport.initialize())
 app.use(passport.session())
 // Serialization
 passport.serializeUser((user, done) => {
-  done(null, user.username)
+  done(null, user.id)
 })
 // Deserialization
-passport.deserializeUser((username, done)=>{
-  const result = user.find((user) => user.username == username)
-  if(result){
-    done(null,result)
+passport.deserializeUser((id, done) => {
+  const result = user.find((user) => user.id == id)
+  if (result) {
+    done(null, result)
   }
-  else{
-    done(false,null)
+  else {
+    done(false, null)
   }
 })
 // Usage of the local strategy
-app.post('/login', passport.authenticate('local'),(req,res) =>{
+app.post('/login', passport.authenticate('local'), (req, res) => {
+  req.session.role = "admin"
   res.send(user)
 })
-// Using localStrategy middleware
-passport.use(new LocalStrategy((username, password, done) =>{
-  // console.log(username)
-  // console.log(password)
-  const results = user.find((user) => user.username == username)
-  // console.log(results)
-  if(results != null) {
-    done(null,results)
+
+app.post('/upload', uploadToDisk.single('filename'), (req, res) => {
+  if(req.session.role == 'admin' || req.session.role == "student"){
+    res.send("upload successfully")
   }
   else{
-    done(false,null)
+    res.send("error occured")
+  }
+})
+
+// Using localStrategy middleware
+passport.use(new LocalStrategy((username, password, done) => {
+  // console.log(password)
+  const results = user.find((user) => user.username == username && user.password == password)
+  console.log(results)
+  if (results != null) {
+    done(null, results)
+  }
+  else {
+    done(false, null)
   }
 
 }))
@@ -65,8 +101,19 @@ app.get('/users', (req, res) => {
   res.send(user)
 })
 
-app.get('/logout', (req, res) =>{
-  req.session.destroy(() =>{
+// for DL
+app.get('/download', (req, res) => {
+  if (req.session.role == 'admin'){
+    const fileName = req.query.filename
+    const image = `${__dirname}/uploads/${fileName}`
+    res.download(image)
+  }
+  else{
+    res.send("error occured")
+  }
+})
+app.get('/logout', (req, res) => {
+  req.session.destroy(() => {
     res.send("session destroyed")
   })
 })
