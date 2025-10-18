@@ -51,11 +51,11 @@ app.use(passport.initialize())
 app.use(passport.session())
 // Serialization
 passport.serializeUser((user, done) => {
-  done(null, user.id)
+  done(null, user.id, user.role)
 })
 // Deserialization
-passport.deserializeUser((id, done) => {
-  const result = user.find((user) => user.id == id)
+passport.deserializeUser((id, role, done) => {
+  const result = user.find((user) => user.id == id && user.role == role)
   if (result) {
     done(null, result)
   }
@@ -63,13 +63,40 @@ passport.deserializeUser((id, done) => {
     done(false, null)
   }
 })
+
+
 // Usage of the local strategy
-app.post('/login', passport.authenticate('local'), (req, res) => {
-  req.session.role = "admin"
-  res.send(user)
+app.post('/login', passport.authenticate('local'), (req, res, next) => {
+  // res.user stores the login information
+  // res.user
+  // req.session.role
+  // res.send("You have successfully login")
+  // try the next part; tomorrow
+
+  
+  // testing for isAuthenticate function
+  if(req.isAuthenticated()){
+    next()
+  }
+  else{
+    res.send("An error occured, please tryers again")
+  }
+},(req,res) => {
+  if(req.user.role == "admin"){
+    req.session.role = "admin"
+    res.send(`Welcome ${req.user.username}!`)
+  }
+  else if(req.user.role == "student"){
+    req.session.role = "student"
+    res.send(`Welcome ${req.user.username}!`)
+  }
+  else{
+    res.send("Role does not exist? I think")
+  }
 })
 
 app.post('/upload', uploadToDisk.single('filename'), (req, res) => {
+  console.log(req.session.role)
   if(req.session.role == 'admin' || req.session.role == "student"){
     res.send("upload successfully")
   }
@@ -82,8 +109,8 @@ app.post('/upload', uploadToDisk.single('filename'), (req, res) => {
 passport.use(new LocalStrategy((username, password, done) => {
   // console.log(password)
   const results = user.find((user) => user.username == username && user.password == password)
-  console.log(results)
   if (results != null) {
+    // req.session.role = result.role
     done(null, results)
   }
   else {
